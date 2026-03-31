@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { TubePainter } from 'three/examples/jsm/Addons.js';
 
 // --- Scene Setup ---
 const container = document.getElementById('canvas-container');
@@ -27,12 +28,12 @@ const parameters = {
   spin: 1,
   randomness: 0.5,
   randomnessPower: 3,
-  
+
   // Dynamic State targets
   targetSpeed: 0.001,
   currentSpeed: 0.001,
   targetSize: 0.02,
-  
+
   colorTransitionAlpha: 1.0,
   currentColorInside: new THREE.Color('#ff6030'),
   targetColorInside: new THREE.Color('#ff6030'),
@@ -114,14 +115,14 @@ const generateInitialGalaxies = () => {
     const px = Math.cos(angle) * distance;
     const pz = Math.sin(angle) * distance;
     const py = (Math.random() - 0.5) * 15;
-    
+
     const map = emotionMaps[key];
     const result = createGalaxyMesh(map.insideColor, map.outsideColor);
     result.mesh.position.set(px, py, pz);
     scene.add(result.mesh);
     bgGalaxies.push({ key, mesh: result.mesh, geom: result.geom, mat: result.mat });
   });
-  
+
   camera.position.set(0, 30, 80);
   camera.lookAt(0, 0, 0);
   currentCameraLook.set(0, 0, 0);
@@ -142,14 +143,14 @@ const emotionContainer = document.getElementById('emotion-buttons-container');
 
 const renderCustomButtons = () => {
   document.querySelectorAll('.btn.custom-added').forEach(b => b.remove());
-  
+
   const addBtn = document.getElementById('btn-add-custom');
   Object.keys(customEmotions).forEach(key => {
     const btn = document.createElement('button');
     btn.className = 'btn custom-added';
     btn.dataset.emotion = key;
     btn.textContent = key.charAt(0).toUpperCase() + key.slice(1);
-    
+
     const c = emotionMaps[key].insideColor;
     btn.addEventListener('mouseenter', () => {
       btn.style.boxShadow = `0 0 20px ${c}80`;
@@ -189,7 +190,7 @@ const setEmotion = (emotionKey) => {
       b.style.borderColor = '';
     }
   });
-  
+
   const targetBtn = document.querySelector(`.btn[data-emotion="${emotionKey}"]`);
   if (targetBtn) {
     targetBtn.classList.add('active');
@@ -203,12 +204,12 @@ const setEmotion = (emotionKey) => {
   parameters.targetSpeed = settings.speed;
   parameters.targetColorInside.set(settings.insideColor);
   parameters.targetColorOutside.set(settings.outsideColor);
-  parameters.colorTransitionAlpha = 0; 
-  
+  parameters.colorTransitionAlpha = 0;
+
   if (isFirstInteraction) {
     isFirstInteraction = false;
     const targetG = bgGalaxies.find(g => g.key === emotionKey) || bgGalaxies[0];
-    
+
     bgGalaxies.forEach(g => {
       if (g !== targetG) {
         g.geom.dispose();
@@ -216,14 +217,14 @@ const setEmotion = (emotionKey) => {
         scene.remove(g.mesh);
       }
     });
-    
+
     points = targetG.mesh;
     geometry = targetG.geom;
     material = targetG.mat;
-    
+
     parameters.targetCameraPos = targetG.mesh.position.clone().add(new THREE.Vector3(0, 3, 10));
     parameters.targetCameraLook = targetG.mesh.position.clone();
-    
+
     parameters.currentColorInside.set(emotionMaps[emotionKey].insideColor);
     parameters.currentColorOutside.set(emotionMaps[emotionKey].outsideColor);
     parameters.currentSpeed = parameters.targetSpeed;
@@ -274,9 +275,9 @@ if (btnFullscreen) {
   btnFullscreen.addEventListener('click', () => {
     const uiLayer = document.querySelector('.ui-layer');
     const sideMenu = document.querySelector('.side-menu');
-    
+
     if (!document.fullscreenElement) {
-      document.documentElement.requestFullscreen().catch(() => {});
+      document.documentElement.requestFullscreen().catch(() => { });
       uiLayer.style.display = 'none';
       sideMenu.style.display = 'none';
       btnFullscreen.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3v3H5m18-3v3h-3m0 18v-3h3M3 21v-3h3"></path></svg>';
@@ -284,7 +285,7 @@ if (btnFullscreen) {
       document.exitFullscreen();
     }
   });
-  
+
   document.addEventListener('fullscreenchange', () => {
     if (!document.fullscreenElement) {
       document.querySelector('.ui-layer').style.display = 'flex';
@@ -312,13 +313,13 @@ document.getElementById('close-add-emotion').addEventListener('click', () => add
 const renderChart = () => {
   const container = document.getElementById('chart-container');
   container.innerHTML = '';
-  
+
   const now = Date.now();
   const cutoff = now - (chartPeriod === 'week' ? 7 * 24 * 60 * 60 * 1000 : 30 * 24 * 60 * 60 * 1000);
-  
+
   const counts = {};
   let maxCount = 0;
-  
+
   trackingLog.forEach(entry => {
     if (entry.time >= cutoff) {
       counts[entry.emotion] = (counts[entry.emotion] || 0) + 1;
@@ -334,15 +335,15 @@ const renderChart = () => {
   Object.keys(counts).forEach(emotion => {
     const wrapper = document.createElement('div');
     wrapper.className = 'bar-wrapper';
-    
+
     // Bar
     const bar = document.createElement('div');
     bar.className = 'bar';
     const heightPercent = Math.max((counts[emotion] / maxCount) * 100, 5);
-    
+
     const baseColor = emotionMaps[emotion] ? emotionMaps[emotion].insideColor : '#ffffff';
     bar.style.background = `linear-gradient(to top, transparent, ${baseColor})`;
-    
+
     setTimeout(() => {
       bar.style.height = `${heightPercent}%`;
     }, 50);
@@ -368,26 +369,26 @@ document.getElementById('submit-custom-emotion').addEventListener('click', () =>
   const nameInput = document.getElementById('custom-emotion-name');
   const descInput = document.getElementById('custom-emotion-desc');
   const errContainer = document.getElementById('custom-emotion-error');
-  
+
   const rawName = nameInput.value.trim().toLowerCase().replace(/[^a-z0-9]/g, '');
-  
+
   if (!rawName) {
     errContainer.textContent = "Please enter a valid single-word name.";
     return;
   }
-  
+
   if (emotionMaps[rawName]) {
     errContainer.textContent = "This emotion already exists.";
     return;
   }
-  
+
   const hInside = Math.random();
   const c = new THREE.Color();
   c.setHSL(hInside, 0.8, 0.5);
   const inside = '#' + c.getHexString();
   c.setHSL(hInside, 0.9, 0.2);
   const outside = '#' + c.getHexString();
-  
+
   const newMap = {
     insideColor: inside,
     outsideColor: outside,
@@ -395,19 +396,19 @@ document.getElementById('submit-custom-emotion').addEventListener('click', () =>
     size: 0.01 + Math.random() * 0.015,
     desc: descInput.value.trim()
   };
-  
+
   customEmotions[rawName] = newMap;
   emotionMaps[rawName] = newMap;
-  
+
   localStorage.setItem('sentientCustomEmotions', JSON.stringify(customEmotions));
-  
+
   renderCustomButtons();
-  
+
   nameInput.value = '';
   descInput.value = '';
   errContainer.textContent = '';
   addEmotionModal.classList.add('hidden');
-  
+
   setEmotion(rawName);
 });
 
@@ -444,28 +445,20 @@ if (submitNoteBtn) {
     notesData.unshift(newNote);
     saveNotes();
     
-    titleInput.value = '';
-    bodyInput.value = '';
-    document.getElementById('write-modal').classList.add('hidden');
+    const noteColor = getEmotionColor(newNote.emotion);
+    const modalContent = document.querySelector('#write-modal .modal-content');
+    modalContent.style.setProperty('--star-color', noteColor);
+    modalContent.classList.add('morph-to-star');
     
-    animateShootingStar(newNote.emotion);
-    if (!document.getElementById('notes-modal').classList.contains('hidden')) renderNotes();
+    setTimeout(() => {
+      document.getElementById('write-modal').classList.add('hidden');
+      modalContent.classList.remove('morph-to-star');
+      titleInput.value = '';
+      bodyInput.value = '';
+      if (!document.getElementById('notes-modal').classList.contains('hidden')) renderNotes();
+    }, 1900);
   });
 }
-
-const animateShootingStar = (emotionKey) => {
-  const geom = new THREE.SphereGeometry(0.3, 16, 16);
-  const mat = new THREE.MeshBasicMaterial({ color: getEmotionColor(emotionKey), transparent: true, opacity: 1 });
-  const star = new THREE.Mesh(geom, mat);
-  star.position.set(20, -15, 40); 
-  scene.add(star);
-  
-  activeAnimations.push({
-    mesh: star, progress: 0, speed: 0.005 + Math.random() * 0.005,
-    startX: star.position.x, startY: star.position.y, startZ: star.position.z,
-    targetX: (Math.random() - 0.5) * 10, targetY: (Math.random() - 0.5) * 10, targetZ: (Math.random() - 0.5) * 10
-  });
-};
 
 const btnNotes = document.getElementById('btn-notes');
 if (btnNotes) {
@@ -504,7 +497,7 @@ const renderFolders = () => {
   const fc = document.getElementById('folders-container');
   if (!fc) return;
   fc.innerHTML = '';
-  
+
   const createFolderEl = (id, text) => {
     const el = document.createElement('div');
     el.className = 'folder-item' + (currentFolderId === id ? ' active' : '');
@@ -525,12 +518,12 @@ const renderNotes = () => {
   if (!nc) return;
   nc.innerHTML = '';
   const visible = notesData.filter(n => currentFolderId === null || n.folderId === currentFolderId);
-  
+
   if (visible.length === 0) {
     nc.innerHTML = '<div style="color:var(--text-secondary);text-align:center;padding:20px;">No notes found here.</div>';
     return;
   }
-  
+
   visible.forEach(n => {
     const el = document.createElement('div');
     el.className = 'note-item';
@@ -558,7 +551,7 @@ const tick = () => {
 
   // Interpolate Speed
   parameters.currentSpeed += (parameters.targetSpeed - parameters.currentSpeed) * 0.02;
-  
+
   if (isFirstInteraction) {
     const elapsed = clock.getElapsedTime();
     bgGalaxies.forEach(g => {
@@ -590,14 +583,14 @@ const tick = () => {
     if (geometry && geometry.attributes.color) {
       const colors = geometry.attributes.color.array;
       const positions = geometry.attributes.position.array;
-      
+
       for (let i = 0; i < parameters.count; i++) {
         const i3 = i * 3;
-        
+
         const x = positions[i3];
-        const y = positions[i3+1];
-        const z = positions[i3+2];
-        const radius = Math.sqrt(x*x + y*y + z*z);
+        const y = positions[i3 + 1];
+        const z = positions[i3 + 2];
+        const radius = Math.sqrt(x * x + y * y + z * z);
 
         const mixedColor = parameters.currentColorInside.clone();
         mixedColor.lerp(parameters.currentColorOutside, radius / parameters.radius);
@@ -633,4 +626,4 @@ const tick = () => {
   window.requestAnimationFrame(tick);
 };
 
-tick();
+tick(); 

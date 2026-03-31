@@ -352,11 +352,13 @@ header p {
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: opacity 1s ease, pointer-events 1s;
+  transition: opacity 1s ease, backdrop-filter 1s ease, -webkit-backdrop-filter 1s ease, pointer-events 1s;
 }
 
 #welcome-screen.hidden {
   opacity: 0;
+  backdrop-filter: blur(0px);
+  -webkit-backdrop-filter: blur(0px);
   pointer-events: none;
 }
 
@@ -525,4 +527,55 @@ header p {
   color: var(--text-secondary);
   line-height: 1.4;
   white-space: pre-wrap;
+}
+
+/* Morph-to-Star Animation */
+.morph-to-star {
+  animation: morphAndFly 2s cubic-bezier(0.2, 0, 0, 1) forwards !important;
+  color: transparent !important;
+  overflow: hidden !important;
+  border-color: transparent !important;
+}
+
+.morph-to-star * {
+  opacity: 0 !important;
+  transition: opacity 0.2s;
+  pointer-events: none;
+}
+
+@keyframes morphAndFly {
+  0% {
+    transform: translate(0, 0) scale(1);
+    background: var(--glass-bg);
+    border-radius: 20px;
+    box-shadow: 0 10px 20px rgba(0, 0, 0, 0.2);
+  }
+  20% {
+    transform: translate(0, 0) scale(0.05);
+    background: var(--star-color, #fff);
+    border-radius: 50%;
+    box-shadow: 0 0 40px 15px var(--star-color, #fff);
+    opacity: 1;
+  }
+  40% {
+    transform: translate(-100px, -80px) scale(0.04);
+    background: var(--star-color, #fff);
+    border-radius: 50%;
+    box-shadow: 0 0 50px 20px var(--star-color, #fff);
+    opacity: 1;
+  }
+  70% {
+    transform: translate(120px, -150px) scale(0.02);
+    background: var(--star-color, #fff);
+    border-radius: 50%;
+    box-shadow: 0 0 80px 25px var(--star-color, #fff);
+    opacity: 0.8;
+  }
+  100% {
+    transform: translate(0, -50px) scale(0);
+    background: var(--star-color, #fff);
+    border-radius: 50%;
+    box-shadow: 0 0 100px 30px var(--star-color, #fff);
+    opacity: 0;
+  }
 }
