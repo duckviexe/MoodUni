@@ -139,6 +139,60 @@
       </div>
     </div>
 
+    <!-- Settings Modal -->
+    <div id="settings-modal" class="modal hidden">
+      <div class="modal-content glass-panel">
+        <button class="close-modal" id="close-settings">&times;</button>
+        <h2>System Settings</h2>
+        
+        <div class="settings-section">
+          <h3>Visuals</h3>
+          <div class="setting-item">
+            <div class="setting-label">
+              <span>Galaxy Density</span>
+              <span id="val-density">50k</span>
+            </div>
+            <input type="range" id="settings-density" min="10000" max="100000" step="5000" value="50000">
+          </div>
+          <div class="setting-item">
+            <div class="setting-label">
+              <span>Star Size</span>
+              <span id="val-size">0.02</span>
+            </div>
+            <input type="range" id="settings-size" min="0.005" max="0.08" step="0.005" value="0.02">
+          </div>
+        </div>
+
+        <div class="settings-section">
+          <h3>Experience</h3>
+          <div class="setting-item">
+            <div class="setting-label">
+              <span>Rotation Speed</span>
+              <span id="val-speed">1.0x</span>
+            </div>
+            <input type="range" id="settings-speed" min="0.1" max="5" step="0.1" value="1">
+          </div>
+          <div class="setting-item toggle-item">
+            <span>Audio Feedback</span>
+            <label class="switch">
+              <input type="checkbox" id="settings-audio" checked>
+              <span class="slider round"></span>
+            </label>
+          </div>
+        </div>
+
+        <div class="settings-divider"></div>
+
+        <div class="settings-section">
+          <h3>Data Management</h3>
+          <div class="setting-actions">
+            <button class="btn danger-btn small-btn" id="btn-reset-tracking">Reset Mood History</button>
+            <button class="btn danger-btn small-btn" id="btn-clear-notes">Clear All Notes</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <script type="module" src="./main.js"></script>
   </body>
 </html>

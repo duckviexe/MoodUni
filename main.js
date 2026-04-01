@@ -310,6 +310,111 @@ document.getElementById('btn-add-custom').addEventListener('click', () => {
 });
 document.getElementById('close-add-emotion').addEventListener('click', () => addEmotionModal.classList.add('hidden'));
 
+// --- Settings Logic ---
+const settingsModal = document.getElementById('settings-modal');
+const btnSettings = document.getElementById('btn-settings');
+const closeSettings = document.getElementById('close-settings');
+
+btnSettings.addEventListener('click', () => {
+  // Sync sliders with current parameters
+  densitySlider.value = parameters.count;
+  valDensity.textContent = parameters.count >= 1000 ? (parameters.count / 1000) + 'k' : parameters.count;
+  
+  sizeSlider.value = parameters.size;
+  valSize.textContent = parameters.size.toFixed(3);
+  
+  speedSlider.value = speedMultiplier;
+  valSpeed.textContent = speedMultiplier.toFixed(1) + 'x';
+
+  settingsModal.classList.remove('hidden');
+});
+
+closeSettings.addEventListener('click', () => {
+  settingsModal.classList.add('hidden');
+});
+
+// Settings Sliders & Inputs
+const densitySlider = document.getElementById('settings-density');
+const sizeSlider = document.getElementById('settings-size');
+const speedSlider = document.getElementById('settings-speed');
+const audioToggle = document.getElementById('settings-audio');
+
+const valDensity = document.getElementById('val-density');
+const valSize = document.getElementById('val-size');
+const valSpeed = document.getElementById('val-speed');
+
+let speedMultiplier = 1.0;
+
+densitySlider.addEventListener('input', (e) => {
+  const val = parseInt(e.target.value);
+  valDensity.textContent = val >= 1000 ? (val / 1000) + 'k' : val;
+});
+
+densitySlider.addEventListener('change', (e) => {
+  parameters.count = parseInt(e.target.value);
+  if (points && !isFirstInteraction) {
+    // Regenerate current galaxy
+    const currentEmotion = activeEmotion !== 'unknown' ? activeEmotion : 'calm';
+    const settings = emotionMaps[currentEmotion];
+    
+    // Cleanup old
+    geometry.dispose();
+    scene.remove(points);
+    
+    // Create new
+    const result = createGalaxyMesh(settings.insideColor, settings.outsideColor);
+    points = result.mesh;
+    geometry = result.geom;
+    material = result.mat;
+    
+    scene.add(points);
+  }
+});
+
+sizeSlider.addEventListener('input', (e) => {
+  const val = parseFloat(e.target.value);
+  valSize.textContent = val.toFixed(3);
+  parameters.size = val;
+  if (material) {
+    material.size = val;
+  }
+});
+
+speedSlider.addEventListener('input', (e) => {
+  const val = parseFloat(e.target.value);
+  valSpeed.textContent = val.toFixed(1) + 'x';
+  speedMultiplier = val;
+});
+
+// Reset Mood History
+document.getElementById('btn-reset-tracking').addEventListener('click', () => {
+  if (confirm('Are you sure you want to clear your emotional journey history?')) {
+    trackingLog = [];
+    localStorage.removeItem('sentientTracking');
+    if (!chartsModal.classList.contains('hidden')) renderChart();
+    alert('History cleared.');
+  }
+});
+
+// Clear All Notes
+document.getElementById('btn-clear-notes').addEventListener('click', () => {
+  if (confirm('Permanent deletion of all stars (notes). Proceed?')) {
+    notesData = [];
+    saveNotes();
+    
+    // Remove shooting stars from scene
+    activeAnimations.forEach(anim => {
+      scene.remove(anim.mesh);
+      anim.mesh.geometry.dispose();
+      anim.mesh.material.dispose();
+    });
+    activeAnimations = [];
+    
+    if (!document.getElementById('notes-modal').classList.contains('hidden')) renderNotes();
+    alert('Notes archived to the void.');
+  }
+});
+
 const renderChart = () => {
   const container = document.getElementById('chart-container');
   container.innerHTML = '';
@@ -420,6 +525,40 @@ let currentFolderId = null;
 const saveNotes = () => localStorage.setItem('sentientNotes', JSON.stringify(notesData));
 const saveFolders = () => localStorage.setItem('sentientFolders', JSON.stringify(foldersData));
 const getEmotionColor = (key) => emotionMaps[key] ? emotionMaps[key].insideColor : '#ffffff';
+const spawnShootingStar = (color) => {
+  const geom = new THREE.SphereGeometry(0.1, 8, 8);
+  const mat = new THREE.MeshBasicMaterial({ 
+    color: new THREE.Color(color),
+    transparent: true,
+    opacity: 1
+  });
+  const mesh = new THREE.Mesh(geom, mat);
+  
+  // Start position: Foreground, slightly below center
+  mesh.position.set(0, 0, 8); 
+  scene.add(mesh);
+
+  // Target: Random point in the galaxy's spiral
+  const radius = 2 + Math.random() * parameters.radius;
+  const angle = Math.random() * Math.PI * 2;
+  const targetX = Math.cos(angle) * radius;
+  const targetZ = Math.sin(angle) * radius;
+  const targetY = (Math.random() - 0.5) * 5;
+
+  activeAnimations.push({
+    mesh: mesh,
+    startX: 0, startY: 0, startZ: 8,
+    targetX: targetX, targetY: targetY, targetZ: targetZ,
+    progress: 0,
+    speed: 0.005, // slow and graceful
+    isPermanent: true,
+    startScale: 0.01,
+    targetScale: 0.2 + Math.random() * 0.3,
+    angle: angle,
+    radius: radius,
+    rotationSpeed: parameters.targetSpeed
+  });
+};
 
 const btnWrite = document.getElementById('btn-write');
 if (btnWrite) {
@@ -456,7 +595,10 @@ if (submitNoteBtn) {
       titleInput.value = '';
       bodyInput.value = '';
       if (!document.getElementById('notes-modal').classList.contains('hidden')) renderNotes();
-    }, 1900);
+      
+      // Spawn 3D shooting star near the end of CSS animation
+      spawnShootingStar(noteColor);
+    }, 1800);
   });
 }
 //progress update
@@ -556,14 +698,14 @@ const tick = () => {
   if (isFirstInteraction) {
     const elapsed = clock.getElapsedTime();
     bgGalaxies.forEach(g => {
-      g.mesh.rotation.y -= parameters.currentSpeed;
-      g.mesh.rotation.x += 0.0005;
+      g.mesh.rotation.y -= parameters.currentSpeed * speedMultiplier;
+      g.mesh.rotation.x += 0.0005 * speedMultiplier;
     });
     camera.position.x = Math.sin(elapsed * 0.1) * 80;
     camera.position.z = Math.cos(elapsed * 0.1) * 80;
     camera.lookAt(0, 0, 0);
   } else if (points) {
-    points.rotation.y -= parameters.currentSpeed;
+    points.rotation.y -= parameters.currentSpeed * speedMultiplier;
   }
 
   if (!isFirstInteraction && parameters.targetCameraPos) {
@@ -605,18 +747,31 @@ const tick = () => {
   }
   for (let i = activeAnimations.length - 1; i >= 0; i--) {
     const anim = activeAnimations[i];
-    anim.progress += anim.speed;
-    if (anim.progress >= 1) {
-      scene.remove(anim.mesh);
-      anim.mesh.geometry.dispose();
-      anim.mesh.material.dispose();
-      activeAnimations.splice(i, 1);
-    } else {
-      const ease = anim.progress < 0.5 ? 2 * anim.progress * anim.progress : 1 - Math.pow(-2 * anim.progress + 2, 2) / 2;
+    
+    if (anim.progress < 1) {
+      anim.progress += anim.speed;
+      const ease = 1 - Math.pow(1 - anim.progress, 3); // Cubic ease-out
+      
       anim.mesh.position.x = anim.startX + (anim.targetX - anim.startX) * ease;
       anim.mesh.position.y = anim.startY + (anim.targetY - anim.startY) * ease;
       anim.mesh.position.z = anim.startZ + (anim.targetZ - anim.startZ) * ease;
-      anim.mesh.scale.setScalar(1 - ease);
+      
+      const s = anim.startScale + (anim.targetScale - anim.startScale) * ease;
+      anim.mesh.scale.setScalar(s);
+    } else {
+      // Permanent star flow logic
+      if (anim.isPermanent) {
+        anim.angle -= parameters.currentSpeed * speedMultiplier; // match galaxy speed
+        anim.mesh.position.x = Math.cos(anim.angle) * anim.radius;
+        anim.mesh.position.z = Math.sin(anim.angle) * anim.radius;
+        // Keep mesh rotation oriented toward center
+        anim.mesh.lookAt(0, 0, 0);
+      } else {
+        scene.remove(anim.mesh);
+        anim.mesh.geometry.dispose();
+        anim.mesh.material.dispose();
+        activeAnimations.splice(i, 1);
+      }
     }
   }
 
