@@ -363,6 +363,9 @@ btnSettings.addEventListener('click', () => {
   speedSlider.value = speedMultiplier;
   valSpeed.textContent = speedMultiplier.toFixed(1) + 'x';
 
+  starsVisibleToggle.checked = settingsStarsVisible;
+  starsClickableToggle.checked = settingsStarsClickable;
+
   settingsModal.classList.remove('hidden');
 });
 
@@ -374,6 +377,8 @@ closeSettings.addEventListener('click', () => {
 const densitySlider = document.getElementById('settings-density');
 const sizeSlider = document.getElementById('settings-size');
 const speedSlider = document.getElementById('settings-speed');
+const starsVisibleToggle = document.getElementById('settings-stars-visible');
+const starsClickableToggle = document.getElementById('settings-stars-clickable');
 const audioToggle = document.getElementById('settings-audio');
 
 const valDensity = document.getElementById('val-density');
@@ -381,6 +386,21 @@ const valSize = document.getElementById('val-size');
 const valSpeed = document.getElementById('val-speed');
 
 let speedMultiplier = 1.0;
+let settingsStarsVisible = true;
+let settingsStarsClickable = true;
+
+starsVisibleToggle.addEventListener('change', (e) => {
+  settingsStarsVisible = e.target.checked;
+  activeAnimations.forEach(anim => {
+    if (anim.state === 'permanent') {
+      anim.mesh.visible = settingsStarsVisible && (activeEmotion === anim.emotion);
+    }
+  });
+});
+
+starsClickableToggle.addEventListener('change', (e) => {
+  settingsStarsClickable = e.target.checked;
+});
 
 densitySlider.addEventListener('input', (e) => {
   const val = parseInt(e.target.value);
@@ -595,7 +615,7 @@ document.getElementById('submit-custom-emotion').addEventListener('click', () =>
 // --- Active Animations & Notes Logic ---
 let notesData = JSON.parse(localStorage.getItem('sentientNotes') || '[]');
 let foldersData = JSON.parse(localStorage.getItem('sentientFolders') || '[]');
-let currentFolderId = null;
+let currentFolderId = 'none'; // Initially show nothing until a folder is clicked
 
 const saveNotes = () => localStorage.setItem('sentientNotes', JSON.stringify(notesData));
 const saveFolders = () => localStorage.setItem('sentientFolders', JSON.stringify(foldersData));
@@ -805,6 +825,24 @@ const renderNotes = () => {
     el.className = 'note-item';
     el.draggable = true;
     el.addEventListener('dragstart', e => e.dataTransfer.setData('text/plain', n.id));
+    
+    // Double click to delete
+    el.addEventListener('dblclick', () => {
+      if (confirm('Permanently delete this note?')) {
+        notesData = notesData.filter(note => note.id !== n.id);
+        saveNotes();
+        renderNotes();
+        
+        // Remove from scene if present
+        for (let i = activeAnimations.length - 1; i >= 0; i--) {
+          if (activeAnimations[i].note && activeAnimations[i].note.id === n.id) {
+            scene.remove(activeAnimations[i].mesh);
+            activeAnimations.splice(i, 1);
+          }
+        }
+      }
+    });
+
     el.innerHTML = `
       <div class="note-header">
         <div>
@@ -881,7 +919,7 @@ const tick = () => {
   // --- Interaction Check ---
   raycaster.setFromCamera(mouse, camera);
   const potentialTargets = activeAnimations
-    .filter(a => a.state === 'permanent' && a.mesh.visible)
+    .filter(a => a.state === 'permanent' && a.mesh.visible && settingsStarsClickable)
     .map(a => a.mesh.children[0]); // check intersection with core mesh
 
   const intersects = raycaster.intersectObjects(potentialTargets);
@@ -929,7 +967,16 @@ const tick = () => {
     if (anim.state === 'init') {
       anim.progress += 0.05;
       const ease = 1 - Math.pow(1 - anim.progress, 3);
-      anim.mesh.position.lerpVectors(anim.spawnPos, anim.circlePosCenter, ease);
+      
+      // Circular motion in: Arc Right
+      const arcPower = 2.0;
+      const xOffset = Math.sin(anim.progress * Math.PI) * arcPower;
+      const yOffset = (Math.cos(anim.progress * Math.PI) - 1) * arcPower;
+      
+      anim.mesh.position.lerpVectors(anim.spawnPos, anim.circlePosCenter, ease)
+        .add(anim.camRight.clone().multiplyScalar(xOffset))
+        .add(anim.camUp.clone().multiplyScalar(yOffset));
+
       anim.mesh.scale.setScalar(anim.startScale + (anim.targetScale - anim.startScale) * ease);
       if (anim.progress >= 1) {
         anim.state = 'circleRight';
@@ -977,30 +1024,41 @@ const tick = () => {
       anim.progress += anim.speed * 2;
       const ease = Math.pow(anim.progress, 2);
 
+      // Curved path: A little to the right, then a little to the left
+      const oscillationScale = 1.0;
+      const swirlX = Math.sin(anim.progress * Math.PI) * oscillationScale;
+      const swirlY = Math.cos(anim.progress * Math.PI * 2) * (oscillationScale * 0.5);
+
       anim.mesh.position.x = anim.startX + (anim.targetX - anim.startX) * ease;
       anim.mesh.position.y = anim.startY + (anim.targetY - anim.startY) * ease;
       anim.mesh.position.z = anim.startZ + (anim.targetZ - anim.startZ) * ease;
+      
+      // Add the "Right/Left" circular flavor
+      anim.mesh.position.add(anim.camRight.clone().multiplyScalar(swirlX));
+      anim.mesh.position.add(anim.camUp.clone().multiplyScalar(swirlY));
 
-      const s = anim.targetScale + (anim.targetScale - anim.targetScale) * ease; // maintain scale
+      const s = anim.targetScale; // maintain scale
       anim.mesh.scale.setScalar(s);
 
       if (anim.progress >= 1) {
         anim.state = 'permanent';
       }
     } else if (anim.state === 'permanent') {
-      // Visibility Filter: Hide stars not belonging to active emotion
-      anim.mesh.visible = (activeEmotion === anim.emotion);
-
-      if (anim.isPermanent && anim.mesh.visible) {
+      // Visibility controlled by emotion and settings
+      if (anim.isPermanent) {
         anim.angle -= parameters.currentSpeed * speedMultiplier;
         anim.mesh.position.x = anim.galaxyPos.x + Math.cos(anim.angle) * anim.radius;
         anim.mesh.position.z = anim.galaxyPos.z + Math.sin(anim.angle) * anim.radius;
         anim.mesh.lookAt(anim.galaxyPos);
-      } else if (!anim.isPermanent) {
+      } else {
         scene.remove(anim.mesh);
         activeAnimations.splice(i, 1);
+        continue;
       }
     }
+
+    // Global override for visibility based on settings and active emotion
+    anim.mesh.visible = settingsStarsVisible && (activeEmotion === anim.emotion);
   }
 
   // Render
@@ -1011,7 +1069,7 @@ const tick = () => {
 };
 
 window.addEventListener('click', () => {
-  if (hoveredStar && hoveredStar.note) {
+  if (hoveredStar && hoveredStar.note && settingsStarsClickable) {
     const modal = document.createElement('div');
     modal.className = 'modal star-note-modal';
     modal.innerHTML = `
