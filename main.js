@@ -45,7 +45,8 @@ let emotionMaps = {
   calm: { insideColor: '#00ffff', outsideColor: '#002255', speed: 0.0005, size: 0.015 },
   happy: { insideColor: '#ffcc00', outsideColor: '#ff5500', speed: 0.002, size: 0.025 },
   energetic: { insideColor: '#ff3300', outsideColor: '#ff00aa', speed: 0.005, size: 0.03 },
-  sad: { insideColor: '#4444aa', outsideColor: '#111122', speed: 0.0002, size: 0.01 },
+  sad: { insideColor: '#1e3a8a', outsideColor: '#0c4a6e', speed: 0.0003, size: 0.012 },
+  melancholic: { insideColor: '#4b5563', outsideColor: '#1f2937', speed: 0.0001, size: 0.01 },
   angry: { insideColor: '#ff0000', outsideColor: '#330000', speed: 0.008, size: 0.03 },
   exhausted: { insideColor: '#5f4b8b', outsideColor: '#2d2243', speed: 0.0001, size: 0.015 },
   unmotivated: { insideColor: '#556b2f', outsideColor: '#2b3618', speed: 0.0003, size: 0.012 },
@@ -53,7 +54,89 @@ let emotionMaps = {
 };
 
 const customEmotions = JSON.parse(localStorage.getItem('sentientCustomEmotions') || '{}');
-emotionMaps = { ...emotionMaps, ...customEmotions };
+const themeOverrides = JSON.parse(localStorage.getItem('sentientThemeOverrides') || '{}');
+
+// Merge everything: defaults <- overrides <- custom
+emotionMaps = { ...emotionMaps, ...themeOverrides, ...customEmotions };
+
+// --- Themes Modal Logic ---
+const themesModal = document.getElementById('themes-modal');
+const btnThemes = document.getElementById('btn-themes');
+const closeThemes = document.getElementById('close-themes');
+const themeEmotionSelect = document.getElementById('theme-emotion-select');
+const themeInsideColor = document.getElementById('theme-inside-color');
+const themeOutsideColor = document.getElementById('theme-outside-color');
+const btnSaveTheme = document.getElementById('btn-save-theme');
+
+const populateThemeSelect = () => {
+  themeEmotionSelect.innerHTML = '';
+  Object.keys(emotionMaps).forEach(key => {
+    const opt = document.createElement('option');
+    opt.value = key;
+    opt.textContent = key.charAt(0).toUpperCase() + key.slice(1);
+    themeEmotionSelect.appendChild(opt);
+  });
+};
+
+const updateThemePickerColors = () => {
+  const emotion = themeEmotionSelect.value;
+  if (emotionMaps[emotion]) {
+    themeInsideColor.value = emotionMaps[emotion].insideColor;
+    themeOutsideColor.value = emotionMaps[emotion].outsideColor;
+  }
+};
+
+btnThemes.addEventListener('click', () => {
+  populateThemeSelect();
+  updateThemePickerColors();
+  themesModal.classList.remove('hidden');
+});
+
+closeThemes.addEventListener('click', () => themesModal.classList.add('hidden'));
+
+themeEmotionSelect.addEventListener('change', updateThemePickerColors);
+
+btnSaveTheme.addEventListener('click', () => {
+  const emotion = themeEmotionSelect.value;
+  const inside = themeInsideColor.value;
+  const outside = themeOutsideColor.value;
+
+  // Store override
+  themeOverrides[emotion] = { ...emotionMaps[emotion], insideColor: inside, outsideColor: outside };
+  emotionMaps[emotion] = themeOverrides[emotion];
+  localStorage.setItem('sentientThemeOverrides', JSON.stringify(themeOverrides));
+
+  // Visual Update
+  if (activeEmotion === emotion) {
+    parameters.targetColorInside.set(inside);
+    parameters.targetColorOutside.set(outside);
+    parameters.colorTransitionAlpha = 0;
+  }
+
+  // Update associated galaxy if we haven't interacted yet
+  if (isFirstInteraction) {
+      const bgG = bgGalaxies.find(g => g.key === emotion);
+      if (bgG) {
+          // Force color change on static background galaxy
+          const colors = bgG.geom.attributes.color.array;
+          const cin = new THREE.Color(inside);
+          const cout = new THREE.Color(outside);
+          for (let i = 0; i < parameters.count; i++) {
+              const i3 = i * 3;
+              const radius = Math.sqrt(Math.pow(bgG.geom.attributes.position.array[i3], 2) + Math.pow(bgG.geom.attributes.position.array[i3 + 2], 2));
+              const mix = cin.clone().lerp(cout, radius / parameters.radius);
+              colors[i3] = mix.r;
+              colors[i3 + 1] = mix.g;
+              colors[i3 + 2] = mix.b;
+          }
+          bgG.geom.attributes.color.needsUpdate = true;
+      }
+  }
+
+  // Visual Feedback
+  btnSaveTheme.textContent = "Saved!";
+  setTimeout(() => { btnSaveTheme.textContent = "Apply to Galaxy"; }, 1000);
+});
 
 const createGalaxyMesh = (cIn, cOut) => {
   const geom = new THREE.BufferGeometry();
@@ -512,41 +595,42 @@ document.getElementById('btn-clear-notes').addEventListener('click', () => {
 
 const renderChart = () => {
   const container = document.getElementById('chart-container');
+  const insightsEl = document.getElementById('chart-insights');
   container.innerHTML = '';
+  if (insightsEl) insightsEl.innerHTML = '';
 
   const now = Date.now();
-  const cutoff = now - (chartPeriod === 'week' ? 7 * 24 * 60 * 60 * 1000 : 30 * 24 * 60 * 60 * 1000);
+  const days = chartPeriod === 'week' ? 7 : 30;
+  const cutoff = now - days * 24 * 60 * 60 * 1000;
 
   const counts = {};
-  let maxCount = 0;
+  let total = 0;
 
   trackingLog.forEach(entry => {
     if (entry.time >= cutoff) {
       counts[entry.emotion] = (counts[entry.emotion] || 0) + 1;
-      if (counts[entry.emotion] > maxCount) maxCount = counts[entry.emotion];
+      total++;
     }
   });
 
-  if (maxCount === 0) {
+  if (total === 0) {
     container.innerHTML = '<p style="color:var(--text-secondary); width: 100%; text-align:center; align-self:center;">No data for this period.</p>';
     return;
   }
 
+  const maxCount = Math.max(...Object.values(counts));
+
+  // --- Bars ---
   Object.keys(counts).forEach(emotion => {
     const wrapper = document.createElement('div');
     wrapper.className = 'bar-wrapper';
 
-    // Bar
     const bar = document.createElement('div');
     bar.className = 'bar';
     const heightPercent = Math.max((counts[emotion] / maxCount) * 100, 5);
-
     const baseColor = emotionMaps[emotion] ? emotionMaps[emotion].insideColor : '#ffffff';
     bar.style.background = `linear-gradient(to top, transparent, ${baseColor})`;
-
-    setTimeout(() => {
-      bar.style.height = `${heightPercent}%`;
-    }, 50);
+    setTimeout(() => { bar.style.height = `${heightPercent}%`; }, 50);
 
     const label = document.createElement('div');
     label.className = 'bar-label';
@@ -556,7 +640,35 @@ const renderChart = () => {
     wrapper.appendChild(label);
     container.appendChild(wrapper);
   });
+
+  // --- Insights ---
+  if (!insightsEl) return;
+
+  // Sort by count descending
+  const sorted = Object.entries(counts)
+    .map(([emotion, count]) => ({ emotion, count, pct: Math.round((count / total) * 100) }))
+    .sort((a, b) => b.pct - a.pct);
+
+  const periodLabel = `last ${days} day${days === 1 ? '' : 's'}`;
+
+  if (sorted.length > 0) {
+    const top = sorted[0];
+    const color = emotionMaps[top.emotion] ? emotionMaps[top.emotion].insideColor : '#ffffff';
+
+    // Top Mood Line
+    const line = document.createElement('div');
+    line.className = 'chart-insight-line insight-dominant';
+    line.innerHTML = `You were <strong style="color:${color}">${top.pct}% ${top.emotion}</strong> over the ${periodLabel}`;
+    insightsEl.appendChild(line);
+
+    // Encouragement Message
+    const encouragement = document.createElement('div');
+    encouragement.className = 'chart-encouragement';
+    encouragement.textContent = "I know you can do better. Keep going!!";
+    insightsEl.appendChild(encouragement);
+  }
 };
+
 
 document.getElementById('toggle-chart-time').addEventListener('click', (e) => {
   chartPeriod = chartPeriod === 'week' ? 'month' : 'week';
@@ -615,7 +727,7 @@ document.getElementById('submit-custom-emotion').addEventListener('click', () =>
 // --- Active Animations & Notes Logic ---
 let notesData = JSON.parse(localStorage.getItem('sentientNotes') || '[]');
 let foldersData = JSON.parse(localStorage.getItem('sentientFolders') || '[]');
-let currentFolderId = 'none'; // Initially show nothing until a folder is clicked
+let currentFolderId = '__none__'; // Initially show nothing until a folder is clicked
 
 const saveNotes = () => localStorage.setItem('sentientNotes', JSON.stringify(notesData));
 const saveFolders = () => localStorage.setItem('sentientFolders', JSON.stringify(foldersData));
@@ -623,26 +735,10 @@ const getEmotionColor = (key) => emotionMaps[key] ? emotionMaps[key].insideColor
 const spawnShootingStar = (color, fastForward = false, noteData = null) => {
   const starGroup = new THREE.Group();
 
-  const coreGeom = new THREE.SphereGeometry(0.12, 12, 12);
-  const coreMat = new THREE.MeshBasicMaterial({
-    color: new THREE.Color(color),
-    transparent: true,
-    opacity: 1
-  });
+  const coreGeom = new THREE.SphereGeometry(0.08, 8, 8);
+  const coreMat = new THREE.MeshBasicMaterial({ color: new THREE.Color(color) });
   const core = new THREE.Mesh(coreGeom, coreMat);
   starGroup.add(core);
-
-  // The "Circle Thing in the Star" - Orbiting particle
-  const orbitGeom = new THREE.SphereGeometry(0.04, 6, 6);
-  const orbitMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
-  const satellite = new THREE.Mesh(orbitGeom, orbitMat);
-  satellite.position.x = 0.25;
-  starGroup.add(satellite);
-
-  // Get coordinate system relative to camera
-  const dir = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
-  const right = new THREE.Vector3(1, 0, 0).applyQuaternion(camera.quaternion);
-  const up = new THREE.Vector3(0, 1, 0).applyQuaternion(camera.quaternion);
 
   const gPos = (points && !isFirstInteraction) ? points.position.clone() : new THREE.Vector3(0, 0, 0);
 
@@ -662,44 +758,33 @@ const spawnShootingStar = (color, fastForward = false, noteData = null) => {
   const targetZ = gPos.z + Math.sin(targetAngle) * targetRadius;
   const targetY = gPos.y + targetHeight;
 
+  // Place star at its final galaxy position immediately
+  starGroup.position.set(targetX, targetY, targetZ);
+  scene.add(starGroup);
+
   if (fastForward) {
-    starGroup.position.set(targetX, targetY, targetZ);
-    scene.add(starGroup);
     activeAnimations.push({
       mesh: starGroup,
-      satellite: satellite,
       state: 'permanent',
       isPermanent: true,
       angle: targetAngle,
       radius: targetRadius,
-      targetY: targetY,
       galaxyPos: gPos,
       note: noteData,
       emotion: noteData.emotion
     });
   } else {
-    const spawnPos = camera.position.clone().add(dir.clone().multiplyScalar(2));
-    const circlePosCenter = camera.position.clone().add(dir.clone().multiplyScalar(5));
-    starGroup.position.copy(spawnPos);
-    scene.add(starGroup);
+    // Capture camera right for the entry circle plane
+    const camRight = new THREE.Vector3(1, 0, 0).applyQuaternion(camera.quaternion).normalize();
     activeAnimations.push({
       mesh: starGroup,
-      satellite: satellite,
-      spawnPos: spawnPos,
-      circlePosCenter: circlePosCenter,
-      camRight: right,
-      camUp: up,
-      targetX: targetX, targetY: targetY, targetZ: targetZ,
-      progress: 0,
-      speed: 0.005,
-      state: 'init',
+      state: 'entry',
       stateCounter: 0,
       isPermanent: true,
-      startScale: 0.01,
-      targetScale: 0.2,
+      targetX, targetY, targetZ,
+      camRight,
       angle: targetAngle,
       radius: targetRadius,
-      rotationSpeed: parameters.targetSpeed,
       galaxyPos: gPos,
       note: noteData,
       emotion: noteData ? noteData.emotion : activeEmotion
@@ -740,7 +825,6 @@ if (submitNoteBtn) {
 
     setTimeout(() => {
       writeModal.classList.add('hidden');
-      // Wait for modal fade out transition before cleaning up class and note, to avoid flash
       setTimeout(() => {
         modalContent.classList.remove('morph-to-star');
         writeModal.classList.remove('morphing');
@@ -749,9 +833,9 @@ if (submitNoteBtn) {
         if (!document.getElementById('notes-modal').classList.contains('hidden')) renderNotes();
       }, 350);
 
-      // Spawn 3D shooting star near the end of CSS animation
+      // Spawn star at galaxy with entry circle animation
       spawnShootingStar(noteColor, false, newNote);
-    }, 1800);
+    }, 700);
   });
 }
 //progress update
@@ -794,25 +878,48 @@ const renderFolders = () => {
   if (!fc) return;
   fc.innerHTML = '';
 
-  const createFolderEl = (id, text) => {
+  const createFolderEl = (id, text, deletable = false) => {
     const el = document.createElement('div');
     el.className = 'folder-item' + (currentFolderId === id ? ' active' : '');
     el.textContent = text;
+    el.title = deletable ? 'Double-click to delete folder' : '';
     el.addEventListener('click', () => { currentFolderId = id; renderFolders(); renderNotes(); });
     el.addEventListener('dragover', e => { e.preventDefault(); el.classList.add('drag-over'); });
     el.addEventListener('dragleave', () => el.classList.remove('drag-over'));
     el.addEventListener('drop', e => { el.classList.remove('drag-over'); handleDrop(e, id); });
+    if (deletable) {
+      el.addEventListener('dblclick', (e) => {
+        e.stopPropagation();
+        if (confirm(`Delete folder "${text.replace('📁 ', '')}"? Notes inside will move to All Notes.`)) {
+          // Move all notes in this folder to root
+          notesData.forEach(n => { if (n.folderId === id) n.folderId = null; });
+          saveNotes();
+          foldersData = foldersData.filter(f => f.id !== id);
+          saveFolders();
+          if (currentFolderId === id) currentFolderId = '__none__';
+          renderFolders();
+          renderNotes();
+        }
+      });
+    }
     return el;
   };
 
-  fc.appendChild(createFolderEl(null, '📁 All Notes'));
-  foldersData.forEach(f => fc.appendChild(createFolderEl(f.id, '📁 ' + f.name)));
+  fc.appendChild(createFolderEl(null, '📁 All Notes', false));
+  foldersData.forEach(f => fc.appendChild(createFolderEl(f.id, '📁 ' + f.name, true)));
 };
 
 const renderNotes = () => {
   const nc = document.getElementById('notes-list-container');
   if (!nc) return;
   nc.innerHTML = '';
+
+  // No folder selected yet — show nothing
+  if (currentFolderId === '__none__') {
+    nc.innerHTML = '<div style="color:var(--text-secondary);text-align:center;padding:20px;">Select a folder to view notes.</div>';
+    return;
+  }
+
   const visible = notesData.filter(n => currentFolderId === null || n.folderId === currentFolderId);
 
   if (visible.length === 0) {
@@ -825,14 +932,14 @@ const renderNotes = () => {
     el.className = 'note-item';
     el.draggable = true;
     el.addEventListener('dragstart', e => e.dataTransfer.setData('text/plain', n.id));
-    
+
     // Double click to delete
     el.addEventListener('dblclick', () => {
       if (confirm('Permanently delete this note?')) {
         notesData = notesData.filter(note => note.id !== n.id);
         saveNotes();
         renderNotes();
-        
+
         // Remove from scene if present
         for (let i = activeAnimations.length - 1; i >= 0; i--) {
           if (activeAnimations[i].note && activeAnimations[i].note.id === n.id) {
@@ -931,11 +1038,18 @@ const tick = () => {
     if (hoveredStar !== anim) {
       if (hoveredStar) hoveredStar.mesh.scale.setScalar(1);
       hoveredStar = anim;
-      hoveredStar.mesh.scale.setScalar(1.5);
+      // No scale-up — just show the label
 
-      // Update preview label
-      const snippet = anim.note.body.slice(0, 40) + (anim.note.body.length > 40 ? '...' : '');
-      previewLabel.textContent = `"${snippet}"`;
+      // Custom label logic: 7 chars max, stop at space if within first 4
+      const text = anim.note.body.trim();
+      const firstSpace = text.indexOf(' ');
+      let result = "";
+      if (firstSpace !== -1 && firstSpace <= 4) {
+        result = text.slice(0, firstSpace);
+      } else {
+        result = text.slice(0, 7);
+      }
+      previewLabel.textContent = `"${result}"`;
       previewLabel.style.display = 'block';
     }
 
@@ -946,7 +1060,6 @@ const tick = () => {
     previewLabel.style.top = (y - 20) + 'px';
   } else {
     if (hoveredStar) {
-      hoveredStar.mesh.scale.setScalar(1);
       hoveredStar = null;
       previewLabel.style.display = 'none';
     }
@@ -957,108 +1070,31 @@ const tick = () => {
   for (let i = activeAnimations.length - 1; i >= 0; i--) {
     const anim = activeAnimations[i];
 
-    // Internal "circle thing" animation logic
-    if (anim.satellite) {
-      const t = elapsed * 3;
-      anim.satellite.position.x = Math.cos(t) * 0.25;
-      anim.satellite.position.y = Math.sin(t) * 0.25;
-    }
-
-    if (anim.state === 'init') {
-      anim.progress += 0.05;
-      const ease = 1 - Math.pow(1 - anim.progress, 3);
-      
-      // Circular motion in: Arc Right
-      const arcPower = 2.0;
-      const xOffset = Math.sin(anim.progress * Math.PI) * arcPower;
-      const yOffset = (Math.cos(anim.progress * Math.PI) - 1) * arcPower;
-      
-      anim.mesh.position.lerpVectors(anim.spawnPos, anim.circlePosCenter, ease)
-        .add(anim.camRight.clone().multiplyScalar(xOffset))
-        .add(anim.camUp.clone().multiplyScalar(yOffset));
-
-      anim.mesh.scale.setScalar(anim.startScale + (anim.targetScale - anim.startScale) * ease);
-      if (anim.progress >= 1) {
-        anim.state = 'circleRight';
-        anim.progress = 0;
-        anim.stateCounter = 0;
-      }
-    } else if (anim.state === 'circleRight') {
-      anim.stateCounter += 0.08;
-      const r = 1.0;
-      const xOffset = Math.sin(anim.stateCounter) * r;
-      const yOffset = (Math.cos(anim.stateCounter) - 1) * r;
-
-      anim.mesh.position.copy(anim.circlePosCenter)
-        .add(anim.camRight.clone().multiplyScalar(xOffset))
-        .add(anim.camUp.clone().multiplyScalar(yOffset));
+    if (anim.state === 'entry') {
+      anim.stateCounter += 0.055;
+      const R = 0.6;
+      const a = anim.stateCounter - Math.PI / 2;
+      anim.mesh.position.x = anim.targetX + Math.cos(a) * R * anim.camRight.x;
+      anim.mesh.position.y = anim.targetY + R + Math.sin(a) * R;
+      anim.mesh.position.z = anim.targetZ + Math.cos(a) * R * anim.camRight.z;
+      anim.mesh.visible = true;
 
       if (anim.stateCounter >= Math.PI * 2) {
-        anim.state = 'pause';
-        anim.stateCounter = 0;
-      }
-    } else if (anim.state === 'pause') {
-      anim.stateCounter += 1;
-      if (anim.stateCounter >= 40) {
-        anim.state = 'circleLeft';
-        anim.stateCounter = 0;
-      }
-    } else if (anim.state === 'circleLeft') {
-      anim.stateCounter += 0.08;
-      const r = 1.0;
-      const xOffset = -Math.sin(anim.stateCounter) * r;
-      const yOffset = (Math.cos(anim.stateCounter) - 1) * r;
-
-      anim.mesh.position.copy(anim.circlePosCenter)
-        .add(anim.camRight.clone().multiplyScalar(xOffset))
-        .add(anim.camUp.clone().multiplyScalar(yOffset));
-
-      if (anim.stateCounter >= Math.PI * 2) {
-        anim.state = 'flyToGalaxy';
-        anim.progress = 0;
-        anim.startX = anim.mesh.position.x;
-        anim.startY = anim.mesh.position.y;
-        anim.startZ = anim.mesh.position.z;
-      }
-    } else if (anim.state === 'flyToGalaxy') {
-      anim.progress += anim.speed * 2;
-      const ease = Math.pow(anim.progress, 2);
-
-      // Curved path: A little to the right, then a little to the left
-      const oscillationScale = 1.0;
-      const swirlX = Math.sin(anim.progress * Math.PI) * oscillationScale;
-      const swirlY = Math.cos(anim.progress * Math.PI * 2) * (oscillationScale * 0.5);
-
-      anim.mesh.position.x = anim.startX + (anim.targetX - anim.startX) * ease;
-      anim.mesh.position.y = anim.startY + (anim.targetY - anim.startY) * ease;
-      anim.mesh.position.z = anim.startZ + (anim.targetZ - anim.startZ) * ease;
-      
-      // Add the "Right/Left" circular flavor
-      anim.mesh.position.add(anim.camRight.clone().multiplyScalar(swirlX));
-      anim.mesh.position.add(anim.camUp.clone().multiplyScalar(swirlY));
-
-      const s = anim.targetScale; // maintain scale
-      anim.mesh.scale.setScalar(s);
-
-      if (anim.progress >= 1) {
+        anim.mesh.position.set(anim.targetX, anim.targetY, anim.targetZ);
         anim.state = 'permanent';
       }
     } else if (anim.state === 'permanent') {
-      // Visibility controlled by emotion and settings
       if (anim.isPermanent) {
-        anim.angle -= parameters.currentSpeed * speedMultiplier;
+        anim.angle -= 0.008 * speedMultiplier;
         anim.mesh.position.x = anim.galaxyPos.x + Math.cos(anim.angle) * anim.radius;
         anim.mesh.position.z = anim.galaxyPos.z + Math.sin(anim.angle) * anim.radius;
-        anim.mesh.lookAt(anim.galaxyPos);
+        // NOTE: no lookAt — sphere looks same from all angles and lookAt causes size distortion
+        anim.mesh.visible = settingsStarsVisible && (activeEmotion === anim.emotion);
       } else {
         scene.remove(anim.mesh);
         activeAnimations.splice(i, 1);
-        continue;
       }
     }
-
-    // Global override for visibility based on settings and active emotion
-    anim.mesh.visible = settingsStarsVisible && (activeEmotion === anim.emotion);
   }
 
   // Render

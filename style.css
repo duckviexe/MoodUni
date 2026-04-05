@@ -167,8 +167,13 @@ header p {
 }
 
 .btn.sad:hover {
-  box-shadow: 0 0 20px rgba(100, 100, 200, 0.4);
-  border-color: #6464c8;
+  box-shadow: 0 0 20px rgba(30, 58, 138, 0.4);
+  border-color: #1e3a8a;
+}
+
+.btn.melancholic:hover {
+  box-shadow: 0 0 20px rgba(75, 85, 99, 0.4);
+  border-color: #4b5563;
 }
 
 .btn.angry:hover {
@@ -281,6 +286,7 @@ header p {
   display: flex;
   flex-direction: column;
   gap: 20px;
+  text-align: center;
 }
 
 .close-modal {
@@ -314,10 +320,11 @@ header p {
   display: flex;
   align-items: flex-end;
   height: 200px;
-  gap: 12px;
-  padding-bottom: 24px;
+  gap: 16px;
+  padding-bottom: 60px; /* Increased to fit rotated labels */
   border-bottom: 1px solid var(--glass-border);
   overflow-x: auto;
+  overflow-y: hidden;
 }
 
 .bar-wrapper {
@@ -325,9 +332,9 @@ header p {
   flex-direction: column;
   justify-content: flex-end;
   align-items: center;
-  flex: 1;
-  min-width: 40px;
+  flex: 0 0 50px; /* Prevent shrinking below 50px */
   height: 100%;
+  position: relative;
 }
 
 .bar {
@@ -338,11 +345,47 @@ header p {
 }
 
 .bar-label {
-  margin-top: 8px;
+  position: absolute;
+  bottom: -65px; /* Shifted up slightly relative to the extra padding */
+  left: 50%;
+  transform: translateX(-50%) rotate(35deg);
+  transform-origin: top left;
   font-size: 0.75rem;
   color: var(--text-secondary);
   text-transform: capitalize;
+  white-space: nowrap;
+}
+
+#chart-insights {
+  margin-top: 24px;
   text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.chart-insight-line {
+  font-size: 1.1rem;
+  color: #fff;
+  opacity: 0;
+  transform: translateY(10px);
+  animation: slideUpFade 0.5s ease-out forwards;
+}
+
+.chart-encouragement {
+  font-size: 0.95rem;
+  color: var(--text-secondary);
+  font-style: italic;
+  opacity: 0;
+  transform: translateY(10px);
+  animation: slideUpFade 0.5s ease-out 0.2s forwards;
+}
+
+@keyframes slideUpFade {
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 /* Forms */
@@ -464,8 +507,8 @@ header p {
 .pixel-cat {
   width: 120px;
   height: 120px;
-  object-fit: contain;
-  image-rendering: pixelated;
+  object-fit: cover;
+  border-radius: 12px;
   animation: hoverUpDown 3s infinite ease-in-out;
 }
 
@@ -632,42 +675,27 @@ header p {
 
 @keyframes morphAndFly {
   0% {
-    transform: translate(0, 0) scale(1);
+    transform: scale(1);
     background: var(--glass-bg);
     border-radius: 20px;
-    box-shadow: 0 10px 20px rgba(0, 0, 0, 0.2);
-  }
-
-  20% {
-    transform: translate(0, 0) scale(0.05);
-    background: var(--star-color, #fff);
-    border-radius: 50%;
-    box-shadow: 0 0 40px 15px var(--star-color, #fff);
     opacity: 1;
+    box-shadow: none;
   }
 
   40% {
-    transform: translate(-100px, -80px) scale(0.04);
+    transform: scale(0.15);
     background: var(--star-color, #fff);
     border-radius: 50%;
-    box-shadow: 0 0 50px 20px var(--star-color, #fff);
+    box-shadow: 0 0 30px 12px var(--star-color, #fff);
     opacity: 1;
-  }
-
-  70% {
-    transform: translate(120px, -150px) scale(0.02);
-    background: var(--star-color, #fff);
-    border-radius: 50%;
-    box-shadow: 0 0 80px 25px var(--star-color, #fff);
-    opacity: 0.8;
   }
 
   100% {
-    transform: translate(0, -100px) scale(0.01);
+    transform: scale(0.01);
     background: var(--star-color, #fff);
     border-radius: 50%;
-    box-shadow: 0 0 100px 30px var(--star-color, #fff);
-    opacity: 1;
+    box-shadow: 0 0 60px 20px var(--star-color, #fff);
+    opacity: 0;
   }
 }
 
@@ -686,6 +714,7 @@ header p {
   border-bottom: 1px solid var(--glass-border);
   padding-bottom: 8px;
   margin-top: 8px;
+  text-align: center;
 }
 
 .setting-item {
@@ -796,6 +825,7 @@ input:checked + .slider:before {
   display: flex;
   gap: 12px;
   flex-wrap: wrap;
+  justify-content: center;
 }
 
 .danger-btn {

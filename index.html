@@ -17,7 +17,7 @@
         <div id="cat-container">
           <div class="chat-bubble">hi!</div>
           <div class="cat-name">Dom</div>
-          <img src="./pixel_cat.png" alt="Pixel Space Cat Dom" class="pixel-cat">
+          <img src="./cat/1.jpg" alt="Pixel Space Cat Dom" class="pixel-cat" id="cat-sprite">
         </div>
 
         <button id="start-btn" class="btn active">Enter</button>
@@ -39,7 +39,8 @@
           <button class="btn calm" data-emotion="calm">Calm</button>
           <button class="btn happy" data-emotion="happy">Joyful</button>
           <button class="btn energetic" data-emotion="energetic">Energetic</button>
-          <button class="btn sad" data-emotion="sad">Melancholic</button>
+          <button class="btn sad" data-emotion="sad">Sad</button>
+          <button class="btn melancholic" data-emotion="melancholic">Melancholic</button>
           <button class="btn angry" data-emotion="angry">Fiery</button>
           <button class="btn exhausted" data-emotion="exhausted">Exhausted</button>
           <button class="btn unmotivated" data-emotion="unmotivated">Unmotivated</button>
@@ -85,6 +86,9 @@
         </div>
         <div class="chart-container" id="chart-container">
           <!-- Bars injected here -->
+        </div>
+        <div id="chart-insights">
+          <!-- Insight lines injected here -->
         </div>
       </div>
     </div>
@@ -139,6 +143,45 @@
       </div>
     </div>
 
+    <!-- Themes Modal -->
+    <div id="themes-modal" class="modal hidden">
+      <div class="modal-content glass-panel">
+        <button class="close-modal" id="close-themes">&times;</button>
+        <h2>Custom Themes</h2>
+        
+        <div class="settings-section">
+          <h3>Emotion Appearance</h3>
+          <div class="setting-item">
+            <label for="theme-emotion-select" class="setting-label">Select Emotion</label>
+            <select id="theme-emotion-select" class="btn" style="width: 100%; margin-top: 5px; text-align: left;">
+              <option value="calm">Calm</option>
+              <option value="happy">Joyful</option>
+              <option value="energetic">Energetic</option>
+              <option value="sad">Sad</option>
+              <option value="melancholic">Melancholic</option>
+              <option value="angry">Fiery</option>
+              <option value="exhausted">Exhausted</option>
+              <option value="unmotivated">Unmotivated</option>
+              <option value="nostalgic">Nostalgic</option>
+            </select>
+          </div>
+          
+          <div class="setting-item">
+            <div class="setting-label">Core Star Color</div>
+            <input type="color" id="theme-inside-color" style="width: 100%; height: 40px; border: none; border-radius: 8px; background: none; cursor: pointer;">
+          </div>
+          
+          <div class="setting-item">
+            <div class="setting-label">Galaxy Glow Color</div>
+            <input type="color" id="theme-outside-color" style="width: 100%; height: 40px; border: none; border-radius: 8px; background: none; cursor: pointer;">
+          </div>
+        </div>
+
+        <div class="settings-divider"></div>
+        <button class="btn" id="btn-save-theme" style="width: 100%;">Apply to Galaxy</button>
+      </div>
+    </div>
+
     <!-- Settings Modal -->
     <div id="settings-modal" class="modal hidden">
       <div class="modal-content glass-panel">
@@ -171,7 +214,6 @@
               <span id="val-speed">1.0x</span>
             </div>
             <input type="range" id="settings-speed" min="0.1" max="5" step="0.1" value="1">
-          </div>
           </div>
           <div class="setting-item toggle-item">
             <span>Show Note-Stars</span>
@@ -207,6 +249,37 @@
         </div>
       </div>
     </div>
+
+    <!-- Cat Sprite Animation -->
+    <script>
+      (function() {
+        const TOTAL_FRAMES = 20;
+        const FPS = 12;
+        const FRAME_MS = 1000 / FPS;
+
+        // Preload all frames
+        const frames = [];
+        for (let i = 1; i <= TOTAL_FRAMES; i++) {
+          const img = new Image();
+          img.src = './cat/' + i + '.jpg';
+          frames.push(img);
+        }
+
+        let currentFrame = 0;
+
+        function tick() {
+          const sprite = document.getElementById('cat-sprite');
+          if (sprite) {
+            currentFrame = (currentFrame + 1) % TOTAL_FRAMES;
+            sprite.src = frames[currentFrame].src;
+          }
+          setTimeout(tick, FRAME_MS);
+        }
+
+        // Start after a short delay to let the DOM paint
+        setTimeout(tick, FRAME_MS);
+      })();
+    </script>
 
     <script type="module" src="./main.js"></script>
   </body>
